@@ -20,8 +20,36 @@ const scene = new THREE.Scene()
 const textureLoader = new THREE.TextureLoader()
 
 /**
+ * SUN
+ */
+const sunGeometry = new THREE.SphereGeometry(1, 64, 64)
+const sumMaterial = new THREE.ShaderMaterial({})
+
+const sun = new THREE.Mesh(sunGeometry, sumMaterial)
+
+sun.position.x = -16
+sun.position.z = 2
+sun.position.y = -1.5
+scene.add(sun)
+
+// Sun Gui
+const sunFolder = gui.addFolder('Sun')
+sunFolder.add(sun.position, 'x').min(-20).max(20).step(.5).name("x-axis")
+sunFolder.add(sun.position, 'z').min(-20).max(20).step(.5).name("z-axis")
+sunFolder.add(sun.position, 'y').min(-20).max(20).step(.5).name("y-axis")
+
+/**
  * Earth
  */
+// Textures
+const earthDayTexture = textureLoader.load('./earth/day.jpg')
+earthDayTexture.colorSpace = THREE.SRGBColorSpace
+
+const earthNightTexture = textureLoader.load('./earth/night.jpg')
+earthNightTexture.colorSpace = THREE.SRGBColorSpace
+
+const earthSpecularCloudsTexture = textureLoader.load('./earth/specularClouds.jpg')
+
 // Mesh
 const earthGeometry = new THREE.SphereGeometry(2, 64, 64)
 const earthMaterial = new THREE.ShaderMaterial({
@@ -29,10 +57,17 @@ const earthMaterial = new THREE.ShaderMaterial({
     fragmentShader: earthFragmentShader,
     uniforms:
     {
+        uDayTexture: new THREE.Uniform(earthDayTexture),
+        uNightTexture: new THREE.Uniform(earthNightTexture),
+        uSpecularCloudsTexture: new THREE.Uniform(earthSpecularCloudsTexture),
+        uSunPosition: new THREE.Uniform(sun.position)
     }
 })
+
 const earth = new THREE.Mesh(earthGeometry, earthMaterial)
 scene.add(earth)
+
+
 
 /**
  * Sizes

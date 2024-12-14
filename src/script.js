@@ -27,9 +27,9 @@ const sumMaterial = new THREE.ShaderMaterial({})
 
 const sun = new THREE.Mesh(sunGeometry, sumMaterial)
 
-sun.position.x = -16
-sun.position.z = 2
-sun.position.y = -1.5
+sun.position.x = 0
+sun.position.z = 6
+sun.position.y = 0
 scene.add(sun)
 
 // Sun Gui
@@ -66,6 +66,9 @@ const earthMaterial = new THREE.ShaderMaterial({
 
 const earth = new THREE.Mesh(earthGeometry, earthMaterial)
 scene.add(earth)
+
+
+// Atmosphere Empty
 
 
 

@@ -28,13 +28,12 @@ void main()
     vec3 nightColor = texture(uNightTexture, vUv).rgb;
     color = mix(nightColor, dayColor, dayMix);
 
-    // Light direction
-    //vec3 lightDir = normalize(uSunPosition - vPosition);
-    //float lightStr = dot(lightDir, normal);
+    // Specular clounds
+    vec2 specularClouds = texture(uSpecularCloudsTexture, vUv).rg;
 
-
-    //lightStr += max(-0.9, lightStr);
-    //color += lightStr * dayColor;
+    // Clouds
+    float cloudMix = specularClouds.g;
+    color = mix(color, vec3(1.0), cloudMix);
 
     // Final color
     gl_FragColor = vec4(color, 1.0);

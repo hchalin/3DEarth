@@ -35,9 +35,6 @@ const textureFlare1 = textureLoader.load('lenses/lensflare1.png')
  * SUN
  */
 
-// Geometry and material
-const sun = new THREE.PointLight(0xffffff, 1.5, 3000);
-sun.scale.set(3,3,3)
 
 // Phi / Theta / sphereical / positin (vec 3)
 //const phi = Math.PI / 4
@@ -50,6 +47,14 @@ const dist = 10; // This is the radius
 const sunSpherical = new THREE.Spherical(dist, phi, theta);
 const sunPosition = new THREE.Vector3();
 // Dont forget to update the suns positino first
+
+// Geometry and material
+const sun = new THREE.Mesh(
+  new THREE.SphereGeometry(dist),
+  new THREE.MeshBasicMaterial()
+)
+sun.material.depthWrite = false
+sun.scale.set(3,3,3)
 updateSunPosition();
 
 // set the sun position
@@ -68,6 +73,7 @@ lenseFlare.addElement(new LensflareElement(textureFlare1, 40, 0.15));  // Even s
 lenseFlare.addElement(new LensflareElement(textureFlare1, 70, 0.17));  // Subtle faint ring
 
 sun.add(lenseFlare)
+
 scene.add(sun);
 
 // Sun Gui
@@ -149,6 +155,7 @@ const earthMaterial = new THREE.ShaderMaterial({
 });
 
 const earth = new THREE.Mesh(earthGeometry, earthMaterial);
+
 scene.add(earth);
 
 // GUI
@@ -237,7 +244,7 @@ renderer.setClearColor("#000011");
 renderer.setClearAlpha = true
 const tick = ()=>{
   const clock = new THREE.Clock()
-  
+
   const elapsedTime = clock.getElapsedTime();
 
   earth.rotation.y = elapsedTime * 0.1;

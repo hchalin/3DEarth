@@ -1,15 +1,16 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+//import { WebGPURenderer } from "three/webgpu";
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
+import { Lensflare, LensflareElement } from "three/examples/jsm/Addons.js";
 import GUI from "lil-gui";
 import earthVertexShader from "./shaders/earth/vertex.glsl";
 import earthFragmentShader from "./shaders/earth/fragment.glsl";
 import atmosphereVertexShader from "./shaders/atmosphere/vertex.glsl"
 import atmosphereFragmentShader from "./shaders/atmosphere/fragment.glsl"
-import flareVertexShader from "./shaders/sunFlare/vertex.glsl"
-import flareFragmentShader from "./shaders/sunFlare/fragment.glsl"
-
 
 /**
  * Base
@@ -35,10 +36,12 @@ const textureFlare1 = textureLoader.load('lenses/lensflare1.png')
  */
 
 // Geometry and material
-const sunLight = new THREE.PointLight(0xffffff, 1.5, 3000);
-//sunLight.scale.set(3,3,3)
+const sun = new THREE.PointLight(0xffffff, 1.5, 3000);
+sun.scale.set(3,3,3)
 
 // Phi / Theta / sphereical / positin (vec 3)
+//const phi = Math.PI / 4
+//const theta = Math.PI / 2
 const phi = 1.5;
 const phiMin = Math.PI / 2 - 0.41;
 const phiMax = Math.PI / 2 + 0.41;
@@ -47,27 +50,25 @@ const dist = 10; // This is the radius
 const sunSpherical = new THREE.Spherical(dist, phi, theta);
 const sunPosition = new THREE.Vector3();
 // Dont forget to update the suns positino first
+updateSunPosition();
 
 // set the sun position
-//sunPosition.setFromSpherical(sunSpherical);
-
-// Sun geometry and mesh
-const sunGeometry = new THREE.SphereGeometry(0.5, 16, 16); // Small sphere
-const sunMaterial = new THREE.MeshBasicMaterial({ color: 0xffd700})
-const sunMesh = new THREE.Mesh(sunGeometry, sunMaterial);
-sunMesh.position.copy(sunLight.position); // Sync position with the PointLight
-
-// Add to scene
-scene.add(sunMesh);
-scene.add(sunLight);
-
-// Update on start
-updateSunPosition();
+sunPosition.setFromSpherical(sunSpherical);
 
 /*
       Lense flare
 */
-// Add a visible sphere to represent the light source
+const lenseFlare = new Lensflare()
+// Add a smaller main bright flare
+lenseFlare.addElement(new LensflareElement(textureFlare0, 200, 0.0)); // Smaller main size
+
+// Add subtle offset halos and dots
+lenseFlare.addElement(new LensflareElement(textureFlare1, 30, 0.12));  // Faint small dot)
+lenseFlare.addElement(new LensflareElement(textureFlare1, 40, 0.15));  // Even smaller halo
+lenseFlare.addElement(new LensflareElement(textureFlare1, 70, 0.17));  // Subtle faint ring
+
+sun.add(lenseFlare)
+scene.add(sun);
 
 // Sun Gui
 const sunFolder = gui.addFolder("Sun");
@@ -106,8 +107,7 @@ function updateSunPosition() {
   sunSpherical.theta = sunSpherical.theta;
   sunSpherical.radius = sunSpherical.radius;
   sunPosition.setFromSpherical(sunSpherical);
-  sunLight.position.copy(sunPosition);
-  sunMesh.position.copy(sunPosition)
+  sun.position.copy(sunPosition);
   //atmosphereMaterial.uniforms.uSunPosition.value.copy(sunPosition)
 }
 
@@ -142,7 +142,7 @@ const earthMaterial = new THREE.ShaderMaterial({
     uDayTexture: new THREE.Uniform(earthDayTexture),
     uNightTexture: new THREE.Uniform(earthNightTexture),
     uSpecularCloudsTexture: new THREE.Uniform(earthSpecularCloudsTexture),
-    uSunPosition: new THREE.Uniform(sunLight.position),
+    uSunPosition: new THREE.Uniform(sun.position),
     uAtmosphereDayColor: new THREE.Uniform(new THREE.Color(earthParameters.atmosphereDayColor)),
     uAtmosphereTwilightColor: new THREE.Uniform(new THREE.Color(earthParameters.atmosphereTwilightColor))
   },
@@ -171,7 +171,7 @@ const atmosphereMaterial = new THREE.ShaderMaterial({
   fragmentShader: atmosphereFragmentShader,
   vertexShader: atmosphereVertexShader,
   uniforms: {
-    uSunPosition: new THREE.Uniform(sunLight.position),
+    uSunPosition: new THREE.Uniform(sun.position),
     uAtmosphereDayColor: new THREE.Uniform(new THREE.Color(earthParameters.atmosphereDayColor)),
     uAtmosphereTwilightColor: new THREE.Uniform(new THREE.Color(earthParameters.atmosphereTwilightColor))
   },
@@ -235,40 +235,9 @@ renderer.setSize(sizes.width, sizes.height);
 renderer.setPixelRatio(sizes.pixelRatio);
 renderer.setClearColor("#000011");
 renderer.setClearAlpha = true
-
-/*
-  Post processing
-*/
-const renderTarget = new THREE.WebGLRenderTarget(
-  sizes.width,
-  sizes.height,
-  //reactivate antalias
-
-  { samples: renderer.getPixelRatio() <= 2 ? 3 : 0 }
-);
-// Set up
-const composer = new EffectComposer(renderer, renderTarget)
-// Project the sun position to screen space
-
-const sunFlareShader = {
-  uniforms: {
-      lightPosition: { value: new THREE.Vector2(0.5, 0.5) }, // Sun position in screen space
-      intensity: { value: 1.5 }, // Flare intensity
-  },
-  vertexShader: flareVertexShader,
-  fragmentShader: flareFragmentShader,
-};
-
-const sunFlarePass = new ShaderPass(sunFlareShader)
-//composer.addPass(sunFlarePass)
-
-/**
- * Animate
- */
-const clock = new THREE.Clock();
-
-const tick = () => {
-
+const tick = ()=>{
+  const clock = new THREE.Clock()
+  
   const elapsedTime = clock.getElapsedTime();
 
   earth.rotation.y = elapsedTime * 0.1;
@@ -278,10 +247,6 @@ const tick = () => {
 
   // Render
   renderer.render(scene, camera);
-  //Apply post-processing
-  composer.render()
-
-
 
   // Call tick again on the next frame
   window.requestAnimationFrame(tick);

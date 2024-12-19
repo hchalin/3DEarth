@@ -1,8 +1,16 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+//import { WebGPURenderer } from "three/webgpu";
+import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
+import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
+import { Lensflare, LensflareElement } from "three/examples/jsm/Addons.js";
 import GUI from "lil-gui";
 import earthVertexShader from "./shaders/earth/vertex.glsl";
 import earthFragmentShader from "./shaders/earth/fragment.glsl";
+import atmosphereVertexShader from "./shaders/atmosphere/vertex.glsl"
+import atmosphereFragmentShader from "./shaders/atmosphere/fragment.glsl"
 
 /**
  * Base
@@ -19,14 +27,17 @@ const scene = new THREE.Scene();
 // Loaders
 const textureLoader = new THREE.TextureLoader();
 
+const textureFlare0 = textureLoader.load('lenses/lensflare0.png')
+const textureFlare1 = textureLoader.load('lenses/lensflare1.png')
+
+
 /**
  * SUN
  */
 
 // Geometry and material
-const sunGeometry = new THREE.IcosahedronGeometry(.1, 2);
-const sumMaterial = new THREE.ShaderMaterial({});
-const sun = new THREE.Mesh(sunGeometry, sumMaterial);
+const sun = new THREE.PointLight(0xffffff, 1.5, 3000);
+sun.scale.set(3,3,3)
 
 // Phi / Theta / sphereical / positin (vec 3)
 //const phi = Math.PI / 4
@@ -34,7 +45,7 @@ const sun = new THREE.Mesh(sunGeometry, sumMaterial);
 const phi = 1.5;
 const phiMin = Math.PI / 2 - 0.41;
 const phiMax = Math.PI / 2 + 0.41;
-const theta = 5.2;
+const theta = 4.82;
 const dist = 10; // This is the radius
 const sunSpherical = new THREE.Spherical(dist, phi, theta);
 const sunPosition = new THREE.Vector3();
@@ -44,6 +55,20 @@ updateSunPosition();
 // set the sun position
 sunPosition.setFromSpherical(sunSpherical);
 
+/*
+      Lense flare
+*/
+const lenseFlare = new Lensflare()
+// Add a smaller main bright flare
+lenseFlare.addElement(new LensflareElement(textureFlare0, 200, 0.0)); // Smaller main size
+
+
+// Add subtle offset halos and dots
+lenseFlare.addElement(new LensflareElement(textureFlare1, 30, 0.09));  // Faint small dot)
+lenseFlare.addElement(new LensflareElement(textureFlare1, 40, 0.15));  // Even smaller halo
+lenseFlare.addElement(new LensflareElement(textureFlare1, 70, 0.17));  // Subtle faint ring
+
+sun.add(lenseFlare)
 scene.add(sun);
 
 // Sun Gui
@@ -58,6 +83,7 @@ sunFolder
   .onChange(() => {
     updateSunPosition();
   });
+
 sunFolder
   .add(sunSpherical, "theta", 0, 2 * Math.PI)
   .step(0.01)
@@ -65,6 +91,7 @@ sunFolder
   .onChange(() => {
     updateSunPosition();
   });
+
 sunFolder
   .add(sunSpherical, "radius", 0, 2 * Math.PI)
   .step(0.1)
@@ -82,27 +109,33 @@ function updateSunPosition() {
   sunSpherical.radius = sunSpherical.radius;
   sunPosition.setFromSpherical(sunSpherical);
   sun.position.copy(sunPosition);
+  //atmosphereMaterial.uniforms.uSunPosition.value.copy(sunPosition)
 }
 
 /**
  * Earth
  */
+// Color
+const earthParameters = {};
+earthParameters.atmosphereDayColor = "#00aaff";
+earthParameters.atmosphereTwilightColor = "#ff6600";
 // Textures
 const earthDayTexture = textureLoader.load("./earth/day.jpg");
 earthDayTexture.colorSpace = THREE.SRGBColorSpace;
-earthDayTexture.anisotropy = 8
+earthDayTexture.anisotropy = 8;
 
 const earthNightTexture = textureLoader.load("./earth/night.jpg");
 earthNightTexture.colorSpace = THREE.SRGBColorSpace;
-earthNightTexture.anisotropy = 8
+earthNightTexture.anisotropy = 8;
 
 const earthSpecularCloudsTexture = textureLoader.load(
   "./earth/specularClouds.jpg"
 );
-earthSpecularCloudsTexture.anisotropy = 8
+earthSpecularCloudsTexture.anisotropy = 8;
 
 // Mesh
-const earthGeometry = new THREE.SphereGeometry(2, 64, 64);
+const earthRadius = 2
+const earthGeometry = new THREE.SphereGeometry(earthRadius, 64, 64);
 const earthMaterial = new THREE.ShaderMaterial({
   vertexShader: earthVertexShader,
   fragmentShader: earthFragmentShader,
@@ -111,16 +144,43 @@ const earthMaterial = new THREE.ShaderMaterial({
     uNightTexture: new THREE.Uniform(earthNightTexture),
     uSpecularCloudsTexture: new THREE.Uniform(earthSpecularCloudsTexture),
     uSunPosition: new THREE.Uniform(sun.position),
+    uAtmosphereDayColor: new THREE.Uniform(new THREE.Color(earthParameters.atmosphereDayColor)),
+    uAtmosphereTwilightColor: new THREE.Uniform(new THREE.Color(earthParameters.atmosphereTwilightColor))
   },
 });
 
 const earth = new THREE.Mesh(earthGeometry, earthMaterial);
 scene.add(earth);
 
-// Anisotrophy
+// GUI
+const earthFolder = gui.addFolder("Earth");
+earthFolder.addColor(earthParameters, 'atmosphereDayColor')
+.onChange(()=>{
+  earthMaterial.uniforms.uAtmosphereDayColor.value.set(earthParameters.atmosphereDayColor)
+  atmosphereMaterial.uniforms.uAtmosphereDayColor.value.set(earthParameters.atmosphereDayColor)
+})
+earthFolder.addColor(earthParameters, 'atmosphereTwilightColor')
+.onChange(()=>{
+  earthMaterial.uniforms.uAtmosphereTwilightColor.value.set(earthParameters.atmosphereTwilightColor)
+  atmosphereMaterial.uniforms.uAtmosphereTwilightColor.value.set(earthParameters.atmosphereTwilightColor)
+})
 
+// Atmosphere
+const atmosphereMaterial = new THREE.ShaderMaterial({
+  side: THREE.BackSide,
+  transparent: true,
+  fragmentShader: atmosphereFragmentShader,
+  vertexShader: atmosphereVertexShader,
+  uniforms: {
+    uSunPosition: new THREE.Uniform(sun.position),
+    uAtmosphereDayColor: new THREE.Uniform(new THREE.Color(earthParameters.atmosphereDayColor)),
+    uAtmosphereTwilightColor: new THREE.Uniform(new THREE.Color(earthParameters.atmosphereTwilightColor))
+  },
+});
 
-// Atmosphere Empty
+const atmosphere = new THREE.Mesh(earthGeometry, atmosphereMaterial)
+atmosphere.scale.set(1.04, 1.04, 1.04)    // set the atmosphere relavent to the earth size
+scene.add(atmosphere)
 
 /**
  * Sizes
@@ -175,7 +235,7 @@ const renderer = new THREE.WebGLRenderer({
 renderer.setSize(sizes.width, sizes.height);
 renderer.setPixelRatio(sizes.pixelRatio);
 renderer.setClearColor("#000011");
-
+renderer.setClearAlpha = true
 /**
  * Animate
  */

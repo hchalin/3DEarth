@@ -3,6 +3,8 @@ uniform sampler2D uDayTexture;
 uniform sampler2D uNightTexture;
 uniform sampler2D uSpecularCloudsTexture;
 uniform vec3 uSunPosition;
+uniform vec3 uAtmosphereDayColor;
+uniform vec3 uAtmosphereTwilightColor;
 
 varying vec2 vUv;
 varying vec3 vNormal;
@@ -32,8 +34,34 @@ void main()
     vec2 specularClouds = texture(uSpecularCloudsTexture, vUv).rg;
 
     // Clouds
-    float cloudMix = specularClouds.g;
+    float cloudMix = smoothstep(.5, 1.0, specularClouds.g);
+    cloudMix *= dayMix;
     color = mix(color, vec3(1.0), cloudMix);
+
+     // Fresnel Effect
+    float fresnel = pow(1.0 - abs(dot(viewDirection, normal)), 2.0);;
+    //  Atmosphere color fresnel mix
+
+    // Atmosphere
+    float atmosphereDayMix = smoothstep(- .5, 1.0, sunOrientation);
+    vec3 atmosphereColor = mix(uAtmosphereTwilightColor, uAtmosphereDayColor, atmosphereDayMix);
+    color = mix(color, atmosphereColor, fresnel * atmosphereDayMix);
+
+    // Specular - use the reflect function glsl provides
+    vec3 reflection = reflect(- normalizedSunPosition, normal);
+    float specular = - dot(reflection, viewDirection);
+    specular = max(specular, 0.0);
+    specular = pow(specular, 32.0);
+
+    // specular map - use clouds map (r channel)
+    specular *= specularClouds.r;           // No specular on the contenents
+    specular *= specularClouds.g;           // only reflect on the clouds
+
+    // Create specular color when specular is on the edges
+    vec3 specularColor = mix(vec3(1.0), atmosphereColor, fresnel);
+    color += specular * specularColor;
+
+    //color = vec3(specularClouds.g);
 
     // Final color
     gl_FragColor = vec4(color, 1.0);
